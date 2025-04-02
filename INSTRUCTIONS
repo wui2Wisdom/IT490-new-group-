@@ -1,0 +1,42 @@
+-Start the Listener:
+
+-On the Web/Application Server, run listener.php:
+
+php /var/www/it490/listener2.php
+
+
+//Test Registration:
+
+-Open register.php in your browser 
+
+-Submit the form to register a new user.
+
+-Verify the user is added to the users table on the Database Server.
+
+// TEST LOGIN
+
+- Open login.php in your browser (e.g., http://WEB_SERVER_IP/login.php).
+
+-Submit the form to log in as an existing user.
+
+-Verify the session is added to the sessions table on the Database Server.
+
+-Check Logs:
+-Monitor the output of listener2.php to ensure messages are being processed correctly.
+
+-Check the RabbitMQ management interface to verify messages are being sent and consumed.
+
+//RESULTS 
+
+-Registration:
+
+A new user is added to the users table.
+
+The listener.php script outputs: User registered: [username].
+
+Login:
+
+A new session is added to the sessions table.
+
+The listener.php script outputs: Login successful: [username].
+ 

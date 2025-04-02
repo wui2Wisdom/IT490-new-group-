@@ -1,0 +1,63 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="CSS/styles.css">
+    <title>Login</title>
+</head>
+<script>
+    function HandleLoginResponse(response) {
+        var text = JSON.parse(response);
+        document.getElementById("textResponse").innerHTML = "Response: " + text.message + "<p>";
+    }
+
+    function SendLoginRequest(username, password) {
+        var request = new XMLHttpRequest();
+        request.open("POST", "login.php", true);
+        request.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+        request.onreadystatechange = function () {
+            if ((this.readyState == 4) && (this.status == 200)) {
+                HandleLoginResponse(this.responseText);
+            }
+        };
+        request.send("username=" + encodeURIComponent(username) + "&password=" + encodeURIComponent(password));
+    }
+
+    function handleFormSubmit(event) {
+        event.preventDefault(); // Prevent the form from submitting normally
+        var username = document.getElementById("username").value;
+        var password = document.getElementById("password").value;
+        SendLoginRequest(username, password);
+    }
+
+    // Attach the form submission handler
+    document.addEventListener("DOMContentLoaded", function () {
+        document.querySelector("form").addEventListener("submit", handleFormSubmit);
+    });
+</script>
+
+<body>
+    <div class="login_form">
+        <form>
+            <h2 class="login">Login</h2>
+            <div>
+                <div class="input_box">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" placeholder="Enter username" required />
+                </div>
+                <div class="input_box">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" placeholder="Enter your password" required />
+                </div>
+                <button type="submit">Log In</button>
+                <p class="sign_up">Don't have an account? <a href="register.html">Sign up</a></p>
+            </div>
+        </form>
+    </div>
+    <div id="textResponse">
+        Awaiting response...
+    </div>
+</body>
+</html>

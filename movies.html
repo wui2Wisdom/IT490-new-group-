@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Movie Explorer</title>
+    <link rel="stylesheet" href="Frontend/CSS/Dashboard.css">
+    <style>
+        /* Movie Grid Styles */
+        .movie-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 20px;
+            padding: 20px;
+        }
+        
+        .movie-card {
+            background: #1f1f1f;
+            border-radius: 8px;
+            overflow: hidden;
+            transition: transform 0.3s;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            cursor: pointer;
+        }
+        
+        .movie-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(229,9,20,0.3);
+        }
+        
+        .movie-poster {
+            width: 100%;
+            height: 270px;
+            object-fit: cover;
+            border-bottom: 3px solid #e50914;
+        }
+        
+        .movie-info {
+            padding: 12px;
+        }
+        
+        .movie-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .movie-meta {
+            display: flex;
+            justify-content: space-between;
+            color: #aaa;
+            font-size: 0.85em;
+        }
+        
+        /* Search & Filters */
+        .movie-controls {
+            display: flex;
+            gap: 15px;
+            padding: 15px 20px;
+            background: #141414;
+            border-bottom: 1px solid #333;
+            flex-wrap: wrap;
+        }
+        
+        .search-container {
+            flex: 2;
+            min-width: 250px;
+        }
+        
+        .filter-container {
+            flex: 1;
+            min-width: 120px;
+        }
+        
+        .search-input {
+            width: 100%;
+            padding: 10px 15px;
+            border-radius: 30px;
+            border: none;
+            background: #333;
+            color: white;
+        }
+        
+        select {
+            width: 100%;
+            padding: 10px;
+            background: #333;
+            border: none;
+            color: white;
+            border-radius: 5px;
+        }
+        
+        /* Loading State */
+        .loading {
+            text-align: center;
+            padding: 50px;
+            color: #aaa;
+            grid-column: 1 / -1;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation (Same as dashboard.html) -->
+    <ul>
+        <li><a href="dashboard.html">Home</a></li>
+        <li><a class="active" href="movies.html">Movies</a></li>
+        <li><a href="profile.html">Profile</a></li>
+        <li class="logout" style="float:right;"><a href="">Logout</a></li>
+    </ul>
+
+    <!-- Search & Filters -->
+    <div class="movie-controls">
+        <div class="search-container">
+            <input type="text" id="searchInput" class="search-input" placeholder="Search movies..." value="movie">
+        </div>
+        <div class="filter-container">
+            <select id="typeFilter">
+                <option value="">All Types</option>
+                <option value="movie">Movies</option>
+                <option value="series">TV Shows</option>
+            </select>
+        </div>
+        <div class="filter-container">
+            <select id="yearFilter">
+                <option value="">All Years</option>
+                <option value="2023">2023</option>
+                <option value="2022">2022</option>
+                <option value="2021">2021</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Movie Grid -->
+    <div class="movie-grid" id="movieGrid">
+        <div class="loading">Loading movies...</div>
+    </div>
+
+    <script>
+        // API Configuration
+        const OMDB_API_KEY = "9cf7c4c9"; // Your API key
+        let currentSearch = "movie"; // Default search
+        let currentPage = 1;
+        
+        // DOM Elements
+        const movieGrid = document.getElementById('movieGrid');
+        const searchInput = document.getElementById('searchInput');
+        const typeFilter = document.getElementById('typeFilter');
+        const yearFilter = document.getElementById('yearFilter');
+        
+        // Fetch movies from OMDB API
+        async function fetchMovies() {
+            movieGrid.innerHTML = '<div class="loading">Loading movies...</div>';
+            
+            try {
+                const type = typeFilter.value;
+                const year = yearFilter.value;
+                
+                const url = `https://www.omdbapi.com/?s=${encodeURIComponent(currentSearch)}&page=${currentPage}&apikey=${OMDB_API_KEY}${type ? `&type=${type}` : ''}${year ? `&y=${year}` : ''}`;
+                
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if (data.Response === "True") {
+                    displayMovies(data.Search);
+                } else {
+                    throw new Error(data.Error || "No movies found");
+                }
+            } catch (error) {
+                movieGrid.innerHTML = `<div class="loading">${error.message}</div>`;
+                console.error("API Error:", error);
+            }
+        }
+        
+        // Display movies in grid
+        function displayMovies(movies) {
+            movieGrid.innerHTML = '';
+            
+            movies.forEach(movie => {
+                const movieCard = document.createElement('div');
+                movieCard.className = 'movie-card';
+                movieCard.innerHTML = `
+                    <img src="${movie.Poster !== "N/A" ? movie.Poster : 'https://via.placeholder.com/180x270?text=No+Poster'}" 
+                         alt="${movie.Title}" 
+                         class="movie-poster">
+                    <div class="movie-info">
+                        <div class="movie-title">${movie.Title}</div>
+                        <div class="movie-meta">
+                            <span>${movie.Year}</span>
+                            <span>${movie.Type}</span>
+                        </div>
+                    </div>
+                `;
+                movieGrid.appendChild(movieCard);
+            });
+        }
+        
+        // Event Listeners
+        searchInput.addEventListener('input', (e) => {
+            currentSearch = e.target.value.trim() || "movie";
+            currentPage = 1;
+            fetchMovies();
+        });
+        
+        typeFilter.addEventListener('change', fetchMovies);
+        yearFilter.addEventListener('change', fetchMovies);
+        
+        // Initialize
+        fetchMovies();
+    </script>
+</body>
+</html>

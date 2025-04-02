@@ -1,0 +1,14 @@
+app.delete('/profile/favorites/:movie_id', authMiddleware, async (req, res) => {
+  const userId = req.user.id;
+  const movieId = req.params.movie_id;
+
+  try {
+    await db.query(
+      'DELETE FROM user_favorites WHERE user_id = $1 AND movie_id = $2',
+      [userId, movieId]
+    );
+    res.json({ success: true, message: 'Movie removed from favorites' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to remove movie from favorites' });
+  }
+});

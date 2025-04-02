@@ -1,0 +1,28 @@
+app.get('/profile', authMiddleware, async (req, res) => {
+  const userId = req.user.id;
+
+  try {
+    // Fetch user details
+    const user = await db.query('SELECT * FROM users WHERE user_id = $1', [userId]);
+    if (!user.rows[0]) return res.status(404).json({ error: 'User not found' });
+
+    // Fetch user favorites
+    const favorites = await db.query(
+      `SELECT m.movie_id, m.title, m.poster_path
+       FROM user_favorites uf
+       JOIN movies m ON uf.movie_id = m.movie_id
+       WHERE uf.user_id = $1`,
+      [userId]
+    );
+
+    res.json({
+      user_id: user.rows[0].user_id,
+      username: user.rows[0].username,
+      email: user.rows[0].email,
+      created_at: user.rows[0].created_at,
+      favorites: favorites.rows,
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch profile' });
+  }
+});

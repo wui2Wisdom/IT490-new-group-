@@ -1,0 +1,14 @@
+app.put('/profile', authMiddleware, async (req, res) => {
+  const userId = req.user.id;
+  const { username, email } = req.body;
+
+  try {
+    await db.query(
+      'UPDATE users SET username = $1, email = $2 WHERE user_id = $3',
+      [username, email, userId]
+    );
+    res.json({ success: true, message: 'Profile updated successfully' });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update profile' });
+  }
+});

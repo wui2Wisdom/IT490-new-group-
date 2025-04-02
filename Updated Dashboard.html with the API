@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="Frontend/CSS/Dashboard.css">
+    <title>Movie Dashboard</title>
+    <style>
+        .favorite-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.2em;
+        }
+        .movie-poster {
+            max-height: 50px;
+        }
+    </style>
+</head>
+
+<body>
+    <ul>
+        <li><a href="dashboard.html">Home</a></li>
+        <li><a class="active" href="movies.html">Movies</a></li>
+        <li><a href="profile.html">Profile</a></li>
+        <li class="logout" style="float:right;"><a href="">Logout</a></li>
+    </ul>
+
+    <input class="search" type="text" placeholder="Search.." id="searchInput">
+
+    <div class="container">
+        <div class="row mt-5">
+            <div class="col">
+                <div class="card mt-5">
+                    <div class="card-header">
+                        <h2 class="display-6 text-center">Movies List</h2>
+                    </div>
+                    <div class="card-body">
+                        <table class="table table-bordered text-center" id="moviesTable">
+                            <tr class="a">
+                                <th> Poster </th>
+                                <th> Movie Title </th>
+                                <th> Year </th>
+                                <th> Rating </th>
+                                <th> Favorite </th>
+                                <th> Type </th>
+                            </tr>
+                            <!-- Movies will be inserted here by JavaScript -->
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // OMDB API Configuration
+        const OMDB_API_KEY = "YOUR_OMDB_API_KEY"; // Replace with your actual key
+        let currentSearch = "action"; // Default search term
+
+        // Fetch movies from OMDB API
+        async function fetchMovies(searchTerm) {
+            try {
+                const response = await fetch(
+                    `https://www.omdbapi.com/?apikey=${OMDB_API_KEY}&s=${encodeURIComponent(searchTerm)}&type=movie`
+                );
+                const data = await response.json();
+                
+                if (data.Response === "False") {
+                    console.error("OMDB Error:", data.Error);
+                    return [];
+                }
+                
+                return data.Search || [];
+            } catch (error) {
+                console.error("Network Error:", error);
+                return [];
+            }
+        }
+
+        // Display movies in the table
+        async function displayMovies(searchTerm = currentSearch) {
+            const movies = await fetchMovies(searchTerm);
+            const table = document.getElementById("moviesTable");
+            
+            // Clear existing rows (except header)
+            const rows = table.querySelectorAll("tr:not(:first-child)");
+            rows.forEach(row => row.remove());
+
+            // Add movie rows
+            movies.forEach(movie => {
+                const row = table.insertRow();
+                row.innerHTML = `
+                    <td><img src="${movie.Poster}" class="movie-poster" onerror="this.src='https://via.placeholder.com/50x75?text=No+Poster'"></td>
+                    <td>${movie.Title}</td>
+                    <td>${movie.Year}</td>
+                    <td>⭐ N/A</td> <!-- OMDB doesn't provide rating in search results -->
+                    <td><button class="favorite-btn" data-id="${movie.imdbID}">♥</button></td>
+                    <td>${movie.Type}</td>
+                `;
+            });
+
+            // Add event listeners to favorite buttons
+            document.querySelectorAll('.favorite-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const movieId = this.getAttribute('data-id');
+                    toggleFavorite(movieId);
+                });
+            });
+        }
+
+        // Toggle favorite (placeholder - you can implement this)
+        function toggleFavorite(movieId) {
+            console.log("Toggled favorite for movie:", movieId);
+            // In a real app, you would save this to your database
+        }
+
+        // Search functionality
+        document.getElementById("searchInput").addEventListener("input", (e) => {
+            const term = e.target.value.trim();
+            if (term.length > 2) {
+                currentSearch = term;
+                displayMovies(term);
+            } else if (term.length === 0) {
+                displayMovies("action"); // Reset to default
+            }
+        });
+
+        // Load movies when page opens
+        displayMovies();
+    </script>
+</body>
+</html>
