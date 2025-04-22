@@ -1,0 +1,180 @@
+<?php
+/**
+ * Authentication Service Listener
+ * 
+ * This script handles user registration and login requests received through RabbitMQ.
+ * It processes messages, interacts with the database, and returns responses.
+ */
+
+// Load dependencies
+require_once __DIR__ . '/vendor/autoload.php';
+use PhpAmqpLib\Connection\AMQPStreamConnection;
+use PhpAmqpLib\Message\AMQPMessage;
+
+// Database configuration
+$dbConfig = [
+    'host' => '172.30.105.20',
+    'name' => 'IT490',
+    'user' => 'IT490',
+    'pass' => 'password'
+];
+
+// RabbitMQ configuration
+$mqConfig = [
+    'host' => '128.235.250.34',
+    'port' => 51820,
+    'user' => 'guest',
+    'pass' => 'guest'
+];
+
+// Connect to database
+try {
+    $dbConnection = new PDO(
+        "mysql:host={$dbConfig['host']};dbname={$dbConfig['name']}", 
+        $dbConfig['user'], 
+        $dbConfig['pass']
+    );
+    $dbConnection->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    echo "Database connection established successfully\n";
+} catch (PDOException $e) {
+    die("Database connection failed: " . $e->getMessage() . "\n");
+}
+
+// Connect to RabbitMQ
+try {
+    $mqConnection = new AMQPStreamConnection(
+        $mqConfig['host'], 
+        $mqConfig['port'], 
+        $mqConfig['user'], 
+        $mqConfig['pass']
+    );
+    $mqChannel = $mqConnection->channel();
+    echo "RabbitMQ connection established successfully\n";
+} catch (Exception $e) {
+    die("RabbitMQ connection failed: " . $e->getMessage() . "\n");
+}
+
+// Declare message queues
+$mqChannel->queue_declare('registration', false, true, false, false);
+$mqChannel->queue_declare('login', false, true, false, false);
+
+echo "Waiting for messages. To exit press CTRL+C\n";
+
+/**
+ * Process incoming messages from RabbitMQ
+ */
+$messageHandler = function ($message) use ($dbConnection, $mqChannel) {
+    $requestData = json_decode($message->body, true);
+    $requestType = $message->get('routing_key');
+    $response = [];
+    
+    echo "Received {$requestType} request for user: {$requestData['username']}\n";
+    
+    if ($requestType === 'registration') {
+        $response = handleRegistration($dbConnection, $requestData);
+    } elseif ($requestType === 'login') {
+        $response = handleLogin($dbConnection, $requestData);
+    } else {
+        $response = ['success' => false, 'message' => 'Unknown request type'];
+    }
+    
+    // Send response back to client
+    $responseMessage = new AMQPMessage(
+        json_encode($response),
+        ['correlation_id' => $message->get('correlation_id')]
+    );
+    
+    $mqChannel->basic_publish($responseMessage, '', $message->get('reply_to'));
+    echo "Response sent: " . json_encode($response) . "\n";
+};
+
+/**
+ * Handle user registration requests
+ */
+function handleRegistration($db, $userData) {
+    try {
+        // Check if username already exists
+        $checkStmt = $db->prepare("SELECT COUNT(*) FROM users WHERE username = :username");
+        $checkStmt->execute(['username' => $userData['username']]);
+        
+        if ($checkStmt->fetchColumn() > 0) {
+            return ['success' => false, 'message' => 'Username already exists'];
+        }
+        
+        // Create new user
+        $insertStmt = $db->prepare(
+            "INSERT INTO users (username, password_hash) VALUES (:username, :password_hash)"
+        );
+        
+        $insertStmt->execute([
+            'username' => $userData['username'],
+            'password_hash' => password_hash($userData['password'], PASSWORD_BCRYPT)
+        ]);
+        
+        return [
+            'success' => true, 
+            'message' => "User registered successfully: {$userData['username']}"
+        ];
+    } catch (PDOException $e) {
+        return ['success' => false, 'message' => "Registration failed: {$e->getMessage()}"];
+    }
+}
+
+/**
+ * Handle user login requests
+ */
+function handleLogin($db, $userData) {
+    try {
+        // Find user by username
+        $stmt = $db->prepare("SELECT * FROM users WHERE username = :username");
+        $stmt->execute(['username' => $userData['username']]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        // Verify credentials
+        if ($user && password_verify($userData['password'], $user['password_hash'])) {
+            // Generate session
+            $sessionKey = bin2hex(random_bytes(16));
+            $expiryTime = (new DateTime('+1 hour'))->format('Y-m-d H:i:s');
+            
+            $sessionStmt = $db->prepare(
+                "INSERT INTO sessions (user_id, session_key, expires_at) 
+                 VALUES (:user_id, :session_key, :expires_at)"
+            );
+            
+            $sessionStmt->execute([
+                'user_id' => $user['id'],
+                'session_key' => $sessionKey,
+                'expires_at' => $expiryTime
+            ]);
+            
+            return [
+                'success' => true, 
+                'session_key' => $sessionKey,
+                'username' => $user['username']
+            ];
+        } else {
+            return ['success' => false, 'message' => 'Invalid username or password'];
+        }
+    } catch (PDOException $e) {
+        return ['success' => false, 'message' => "Login failed: {$e->getMessage()}"];
+    }
+}
+
+// Start consuming messages
+$mqChannel->basic_consume('registration', '', false, true, false, false, $messageHandler);
+$mqChannel->basic_consume('login', '', false, true, false, false, $messageHandler);
+
+// Keep the script running until interrupted
+try {
+    while ($mqChannel->is_consuming()) {
+        $mqChannel->wait();
+    }
+} catch (Exception $e) {
+    echo "Error: " . $e->getMessage() . "\n";
+} finally {
+    // Clean up connections
+    $mqChannel->close();
+    $mqConnection->close();
+    echo "Connections closed\n";
+}
+?>
